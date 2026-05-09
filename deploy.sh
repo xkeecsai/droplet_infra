@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pull latest from each dashboard repo and roll the stack.
-# Run on the droplet from /opt/kx/kx-infra: `./deploy.sh`
-# Or trigger from your laptop: `ssh kx-droplet 'cd /opt/kx/kx-infra && ./deploy.sh'`
+# Run on the droplet from /opt/kx/droplet_infra: `./deploy.sh`
+# Or trigger from your laptop: `ssh kx-droplet 'cd /opt/kx/droplet_infra && ./deploy.sh'`
 
 set -euo pipefail
 
@@ -9,7 +9,7 @@ log() { printf "\033[1;32m[deploy]\033[0m %s\n" "$*"; }
 
 cd "$(dirname "$0")"
 
-log "Pulling kx-infra..."
+log "Pulling droplet_infra..."
 git pull --ff-only
 
 log "Rebuilding services (forces re-clone of dashboard repos)..."

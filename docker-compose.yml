@@ -1,6 +1,6 @@
 # KX macro dashboards — Droplet orchestration.
 # All dashboards build from their own GitHub repos. Postgres + Caddy provided here.
-# `docker compose up -d --build` from /opt/kx/kx-infra after bootstrap.sh.
+# `docker compose up -d --build` from /opt/kx/droplet_infra after bootstrap.sh.
 
 services:
   caddy:

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Daily Postgres dump → ./pg_backup/ and rotates older than N days.
 # Wire to cron with e.g.:
-#   0 3 * * *  /opt/kx/kx-infra/backup.sh > /var/log/kx-backup.log 2>&1
+#   0 3 * * *  /opt/kx/droplet_infra/backup.sh > /var/log/kx-backup.log 2>&1
 
 set -euo pipefail
 

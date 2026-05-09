@@ -1,4 +1,4 @@
-# Common ops shortcuts — run from the droplet, /opt/kx/kx-infra.
+# Common ops shortcuts — run from the droplet, /opt/kx/droplet_infra.
 # `make help` to list.
 
 .DEFAULT_GOAL := help

@@ -1,4 +1,4 @@
-# kx-infra
+# droplet_infra
 
 > Meta-repo orchestrating the macro dashboards on a single DigitalOcean Droplet.
 > Each dashboard lives in its own repo. Caddy + Docker Compose + Postgres on top.
@@ -82,7 +82,7 @@ Set Cloudflare proxy to **DNS-only** for the first deploy — Caddy needs to tal
 ssh root@<droplet-ipv4>
 
 # (one-shot remote bootstrap)
-curl -fsSL https://raw.githubusercontent.com/<you>/kx-infra/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/xkeecsai/droplet_infra/main/bootstrap.sh | bash
 ```
 
 Or copy `bootstrap.sh` over and run it manually. It's idempotent — safe to re-run.
@@ -93,8 +93,8 @@ Still on the droplet:
 
 ```bash
 cd /opt/kx
-git clone https://github.com/<you>/kx-infra.git
-cd kx-infra
+git clone https://github.com/xkeecsai/droplet_infra.git
+cd droplet_infra
 
 cp .env.example .env
 nano .env       # set POSTGRES_PASSWORD; paste any API keys you have
@@ -136,7 +136,7 @@ make shell-liquidity   # bash into a specific container
 
 ```bash
 # Add to root crontab (`crontab -e`)
-0 3 * * *  cd /opt/kx/kx-infra && ./backup.sh > /var/log/kx-backup.log 2>&1
+0 3 * * *  cd /opt/kx/droplet_infra && ./backup.sh > /var/log/kx-backup.log 2>&1
 ```
 
 Optional — push dumps off-droplet to DO Spaces or S3 for true durability:

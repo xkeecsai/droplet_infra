@@ -77,8 +77,8 @@ cat <<EOF
 ║  Bootstrap complete. Next steps:                               ║
 ║                                                                ║
 ║    cd /opt/kx                                                  ║
-║    git clone https://github.com/<you>/kx-infra.git             ║
-║    cd kx-infra                                                 ║
+║    git clone https://github.com/xkeecsai/droplet_infra.git     ║
+║    cd droplet_infra                                            ║
 ║    cp .env.example .env                                        ║
 ║    nano .env             # set POSTGRES_PASSWORD etc.          ║
 ║    nano Caddyfile        # replace kxmacro.com with your domain║
