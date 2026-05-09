@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 # Idempotent first-time setup for a fresh Ubuntu 24.04 droplet.
-# PRIVATE-BY-DEFAULT: installs Tailscale, closes public ports 80/443.
-# Only your tailnet devices will be able to reach the dashboards.
+# PRIVATE-BY-DEFAULT: dashboards are reachable only via your Tailscale tailnet.
+# Each dashboard has its own Tailscale sidecar with auto-HTTPS.
 #
 # Run as root via DO console:
 #   curl -fsSL https://raw.githubusercontent.com/xkeecsai/droplet_infra/main/bootstrap.sh | TS_AUTHKEY=tskey-... bash
 #
-# Or copy the file over and run manually.
-#
-# Required env vars when running:
-#   TS_AUTHKEY          (recommended) — generate at tailscale.com/admin/settings/keys
-#                       Without this, you'll need to authenticate Tailscale interactively.
+# Required env var:
+#   TS_AUTHKEY  Reusable + non-ephemeral auth key from
+#               https://login.tailscale.com/admin/settings/keys
+#               (used here for the host AND by sidecar containers later)
 
 set -euo pipefail
 
@@ -36,7 +35,7 @@ if ! swapon --show | grep -q '/swapfile'; then
     grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
-# ---- Tailscale ----
+# ---- Tailscale on host ----
 if ! command -v tailscale >/dev/null 2>&1; then
     log "Installing Tailscale..."
     curl -fsSL https://tailscale.com/install.sh | sh
@@ -45,7 +44,7 @@ fi
 systemctl enable --now tailscaled
 
 if [[ -n "${TS_AUTHKEY:-}" ]]; then
-    log "Joining tailnet via auth key..."
+    log "Joining tailnet via auth key (host)..."
     tailscale up \
         --authkey="${TS_AUTHKEY}" \
         --ssh \
@@ -53,16 +52,15 @@ if [[ -n "${TS_AUTHKEY:-}" ]]; then
         --accept-routes
 else
     log "No TS_AUTHKEY provided — bringing up Tailscale interactively."
-    log "Open the URL printed below on any device, then re-run bootstrap.sh."
+    log "After auth completes, re-run with TS_AUTHKEY for sidecars."
     tailscale up --ssh --hostname="kx-macro" --accept-routes || true
 fi
 
-# Show tailnet IP
 TS_IP=$(tailscale ip -4 || echo "<not-yet-joined>")
-log "Tailscale IPv4: ${TS_IP}"
+log "Tailscale IPv4 (host): ${TS_IP}"
 
-# ---- Firewall: only SSH on public, full open on tailscale0 ----
-log "Configuring UFW (public: SSH only; tailnet: everything)..."
+# ---- Firewall: only SSH on public ----
+log "Configuring UFW (public: SSH only)..."
 apt-get install -y ufw fail2ban
 ufw --force reset
 ufw default deny incoming
@@ -99,35 +97,38 @@ chown root:root /opt/kx
 log "Done."
 cat <<EOF
 
-╔══════════════════════════════════════════════════════════════════╗
-║  Bootstrap complete. Tailscale IPv4: ${TS_IP}
-║                                                                  ║
-║  Public surface: only SSH (port 22) reachable from the internet. ║
-║  Dashboards will be reachable ONLY from your tailnet.            ║
-║                                                                  ║
-║  Next steps:                                                     ║
-║                                                                  ║
-║    cd /opt/kx                                                    ║
-║    git clone https://github.com/xkeecsai/droplet_infra.git       ║
-║    cd droplet_infra                                              ║
-║    cp .env.example .env                                          ║
-║    nano .env                                                     ║
-║      # set POSTGRES_PASSWORD                                     ║
-║      # set CLOUDFLARE_API_TOKEN (Zone:DNS:Edit on your domain)   ║
-║      # paste any other API keys you have                         ║
-║    nano Caddyfile     # replace kxmacro.com with your domain     ║
-║                                                                  ║
-║  In Cloudflare DNS, add A records pointing at ${TS_IP}:
-║      liquidity   A    ${TS_IP}
-║      growth      A    ${TS_IP}
-║      inflation   A    ${TS_IP}
-║      seasonality A    ${TS_IP}
-║                                                                  ║
-║  Set Cloudflare proxy = "DNS only" (grey cloud). The IP is in    ║
-║  the Tailscale 100.x.x.x range so only tailnet devices can       ║
-║  actually connect. Cloudflare DNS-01 still works because it      ║
-║  validates via the DNS TXT record, not HTTP on the IP.           ║
-║                                                                  ║
-║  Then:  docker compose up -d --build                             ║
-╚══════════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════════════╗
+║  Bootstrap complete.                                                 ║
+║                                                                      ║
+║  Host on tailnet: kx-macro (${TS_IP})
+║  Public surface: only SSH (port 22).                                 ║
+║                                                                      ║
+║  Next steps:                                                         ║
+║                                                                      ║
+║    cd /opt/kx                                                        ║
+║    git clone https://github.com/xkeecsai/droplet_infra.git           ║
+║    cd droplet_infra                                                  ║
+║    cp .env.example .env                                              ║
+║    nano .env                                                         ║
+║      # set POSTGRES_PASSWORD                                         ║
+║      # paste TS_AUTHKEY (same key, REUSABLE non-ephemeral)           ║
+║      # paste any optional API keys                                   ║
+║                                                                      ║
+║    docker compose up -d --build                                      ║
+║                                                                      ║
+║  Once up, your dashboards will appear in your Tailscale admin as     ║
+║  separate devices: liquidity, growth, inflation, seasonality.        ║
+║                                                                      ║
+║  Access from any tailnet-connected device at:                        ║
+║                                                                      ║
+║    https://liquidity.<your-tailnet>.ts.net                           ║
+║    https://growth.<your-tailnet>.ts.net                              ║
+║    https://inflation.<your-tailnet>.ts.net                           ║
+║    https://seasonality.<your-tailnet>.ts.net                         ║
+║                                                                      ║
+║  (Real Let's Encrypt certs, auto-issued by Tailscale. No domain      ║
+║   purchase, no DNS config, no Caddy needed.)                         ║
+║                                                                      ║
+║  Find your tailnet's name in the Tailscale admin sidebar.            ║
+╚══════════════════════════════════════════════════════════════════════╝
 EOF

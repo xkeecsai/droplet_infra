@@ -1,35 +1,20 @@
-# KX macro dashboards — Droplet orchestration. Private-by-default.
-# All dashboards build from their own GitHub repos. Postgres + Caddy provided here.
-# `docker compose up -d --build` from /opt/kx/droplet_infra after bootstrap.sh.
+# KX macro dashboards — Droplet orchestration. Tailscale-only, private-by-default.
 #
-# Privacy model: bootstrap.sh installs Tailscale and closes public ports 80/443.
-# Caddy's published ports remain on 0.0.0.0 inside the docker network, but the
-# host firewall only accepts traffic on the `tailscale0` interface. Caddy uses
-# Cloudflare DNS-01 challenge for certs — no public HTTP exposure required.
+# Each dashboard is paired with a Tailscale sidecar that:
+#   - Joins your tailnet as a separate node (e.g. `liquidity`)
+#   - Exposes the dashboard at https://<name>.<your-tailnet>.ts.net
+#   - Auto-provisions a real Let's Encrypt cert (Tailscale issues these for free)
+#
+# No custom domain, no Cloudflare, no Caddy. Postgres stays on an internal
+# Docker network and is reachable only from dashboard containers.
+#
+# `docker compose up -d --build` from /opt/kx/droplet_infra after bootstrap.sh.
 
 services:
-  caddy:
-    build:
-      context: ./caddy           # custom build with Cloudflare DNS plugin
-    container_name: caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"            # HTTP/3
-    environment:
-      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?must set CLOUDFLARE_API_TOKEN in .env}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - liquidity
-      - growth
-      - inflation
-      - seasonality
-    networks: [kx]
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # Postgres — internal only, never exposed to tailnet
+  # ─────────────────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: postgres
@@ -48,6 +33,28 @@ services:
       retries: 5
     networks: [kx]
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # Liquidity — Tailscale sidecar + Dash app
+  # ─────────────────────────────────────────────────────────────────────────
+  ts-liquidity:
+    image: tailscale/tailscale:latest
+    container_name: ts-liquidity
+    hostname: liquidity
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?must set TS_AUTHKEY in .env (reusable key)}
+      TS_HOSTNAME: liquidity
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "false"
+      TS_ENABLE_HEALTH_CHECK: "true"
+    volumes:
+      - ts-liquidity-state:/var/lib/tailscale
+      - ./tailscale/liquidity-serve.json:/config/serve.json:ro
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [NET_ADMIN, NET_RAW]
+    networks: [kx]
+
   liquidity:
     build:
       context: https://github.com/xkeecsai/liquidity_indicators.git#main
@@ -57,10 +64,33 @@ services:
       PORT: "8050"
       FRED_API_KEY: ${FRED_API_KEY:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
-    expose: ["8050"]
+    network_mode: "service:ts-liquidity"
     depends_on:
+      ts-liquidity:
+        condition: service_started
       postgres:
         condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Growth
+  # ─────────────────────────────────────────────────────────────────────────
+  ts-growth:
+    image: tailscale/tailscale:latest
+    container_name: ts-growth
+    hostname: growth
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?}
+      TS_HOSTNAME: growth
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "false"
+      TS_ENABLE_HEALTH_CHECK: "true"
+    volumes:
+      - ts-growth-state:/var/lib/tailscale
+      - ./tailscale/growth-serve.json:/config/serve.json:ro
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [NET_ADMIN, NET_RAW]
     networks: [kx]
 
   growth:
@@ -72,10 +102,33 @@ services:
       PORT: "8051"
       FRED_API_KEY: ${FRED_API_KEY:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
-    expose: ["8051"]
+    network_mode: "service:ts-growth"
     depends_on:
+      ts-growth:
+        condition: service_started
       postgres:
         condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Inflation
+  # ─────────────────────────────────────────────────────────────────────────
+  ts-inflation:
+    image: tailscale/tailscale:latest
+    container_name: ts-inflation
+    hostname: inflation
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?}
+      TS_HOSTNAME: inflation
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "false"
+      TS_ENABLE_HEALTH_CHECK: "true"
+    volumes:
+      - ts-inflation-state:/var/lib/tailscale
+      - ./tailscale/inflation-serve.json:/config/serve.json:ro
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [NET_ADMIN, NET_RAW]
     networks: [kx]
 
   inflation:
@@ -88,10 +141,33 @@ services:
       FRED_API_KEY: ${FRED_API_KEY:-}
       TRUFLATION_API_KEY: ${TRUFLATION_API_KEY:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
-    expose: ["8052"]
+    network_mode: "service:ts-inflation"
     depends_on:
+      ts-inflation:
+        condition: service_started
       postgres:
         condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Seasonality (Streamlit)
+  # ─────────────────────────────────────────────────────────────────────────
+  ts-seasonality:
+    image: tailscale/tailscale:latest
+    container_name: ts-seasonality
+    hostname: seasonality
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?}
+      TS_HOSTNAME: seasonality
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "false"
+      TS_ENABLE_HEALTH_CHECK: "true"
+    volumes:
+      - ts-seasonality-state:/var/lib/tailscale
+      - ./tailscale/seasonality-serve.json:/config/serve.json:ro
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [NET_ADMIN, NET_RAW]
     networks: [kx]
 
   seasonality:
@@ -101,45 +177,53 @@ services:
     restart: unless-stopped
     environment:
       PORT: "8501"
-    expose: ["8501"]
-    networks: [kx]
+    network_mode: "service:ts-seasonality"
+    depends_on:
+      ts-seasonality:
+        condition: service_started
 
-  # ---------------------------------------------------------------------------
-  # Bloomberg gateway — placeholder. Uncomment once you have a working blpapi
-  # build context (Bloomberg cpp/Python SDK + B-PIPE creds whitelisted).
-  # ---------------------------------------------------------------------------
+  # ─────────────────────────────────────────────────────────────────────────
+  # Bloomberg gateway — uncomment when you have blpapi access
+  # ─────────────────────────────────────────────────────────────────────────
+  # ts-bbg:
+  #   image: tailscale/tailscale:latest
+  #   container_name: ts-bbg
+  #   hostname: bbg
+  #   restart: unless-stopped
+  #   environment:
+  #     TS_AUTHKEY: ${TS_AUTHKEY:?}
+  #     TS_HOSTNAME: bbg
+  #     TS_STATE_DIR: /var/lib/tailscale
+  #     TS_SERVE_CONFIG: /config/serve.json
+  #     TS_USERSPACE: "false"
+  #   volumes:
+  #     - ts-bbg-state:/var/lib/tailscale
+  #     - ./tailscale/bbg-serve.json:/config/serve.json:ro
+  #     - /dev/net/tun:/dev/net/tun
+  #   cap_add: [NET_ADMIN, NET_RAW]
+  #   networks: [kx]
+  #
   # bbg-gateway:
   #   build:
   #     context: https://github.com/xkeecsai/bbg_gateway.git#main
   #   container_name: bbg-gateway
   #   restart: unless-stopped
   #   environment:
+  #     PORT: "8053"
   #     BLOOMBERG_HOST: ${BLOOMBERG_HOST:-}
-  #     BLOOMBERG_PORT: ${BLOOMBERG_PORT:-8194}
   #     DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
-  #   networks: [kx]
-
-  # ---------------------------------------------------------------------------
-  # Cron ingestor — pulls FRED + paid feeds nightly into Postgres.
-  # ---------------------------------------------------------------------------
-  # ingestor:
-  #   build:
-  #     context: https://github.com/xkeecsai/data_ingestor.git#main
-  #   container_name: ingestor
-  #   restart: unless-stopped
-  #   environment:
-  #     FRED_API_KEY: ${FRED_API_KEY:-}
-  #     EODHD_API_KEY: ${EODHD_API_KEY:-}
-  #     TRUFLATION_API_KEY: ${TRUFLATION_API_KEY:-}
-  #     DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
+  #   network_mode: "service:ts-bbg"
   #   depends_on:
+  #     ts-bbg: { condition: service_started }
   #     postgres: { condition: service_healthy }
-  #   networks: [kx]
 
 volumes:
-  caddy_data:
-  caddy_config:
   pg_data:
+  ts-liquidity-state:
+  ts-growth-state:
+  ts-inflation-state:
+  ts-seasonality-state:
+  # ts-bbg-state:
 
 networks:
   kx:
