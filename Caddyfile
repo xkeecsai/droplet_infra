@@ -1,0 +1,54 @@
+# Caddy auto-provisions Let's Encrypt certs and renews them. Just put a real
+# domain on the left and a docker-compose service:port on the right.
+#
+# Replace `kxmacro.com` with your actual domain (Cloudflare-bought etc.)
+# BEFORE first `docker compose up`. Caddy validates against the live DNS.
+#
+# Once you have more dashboards, add a block per subdomain — Caddy reloads
+# automatically on file change inside the container.
+{
+    # Optional: enable email for Let's Encrypt expiry notifications
+    email admin@kxmacro.com
+}
+
+liquidity.kxmacro.com {
+    reverse_proxy liquidity:8050
+    encode zstd gzip
+    log {
+        output file /data/access-liquidity.log
+        format console
+    }
+}
+
+growth.kxmacro.com {
+    reverse_proxy growth:8051
+    encode zstd gzip
+    log {
+        output file /data/access-growth.log
+        format console
+    }
+}
+
+inflation.kxmacro.com {
+    reverse_proxy inflation:8052
+    encode zstd gzip
+    log {
+        output file /data/access-inflation.log
+        format console
+    }
+}
+
+seasonality.kxmacro.com {
+    reverse_proxy seasonality:8501
+    encode zstd gzip
+    # Streamlit needs websocket pass-through (Caddy does this by default)
+    log {
+        output file /data/access-seasonality.log
+        format console
+    }
+}
+
+# Optional: a landing/redirect at the apex
+# kxmacro.com, www.kxmacro.com {
+#     redir https://liquidity.kxmacro.com{uri}
+# }

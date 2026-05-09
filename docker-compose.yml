@@ -1,0 +1,140 @@
+# KX macro dashboards — Droplet orchestration.
+# All dashboards build from their own GitHub repos. Postgres + Caddy provided here.
+# `docker compose up -d --build` from /opt/kx/kx-infra after bootstrap.sh.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"     # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - liquidity
+      - growth
+      - inflation
+      - seasonality
+    networks: [kx]
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?must set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-macro}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./pg_backup:/backup
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kx} -d ${POSTGRES_DB:-macro}"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    # Postgres deliberately NOT exposed to host. Containers reach it via the kx network.
+    networks: [kx]
+
+  liquidity:
+    build:
+      context: https://github.com/xkeecsai/liquidity_indicators.git#main
+    container_name: liquidity
+    restart: unless-stopped
+    environment:
+      PORT: "8050"
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
+    expose: ["8050"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kx]
+
+  growth:
+    build:
+      context: https://github.com/xkeecsai/growth_indicators_dash.git#main
+    container_name: growth
+    restart: unless-stopped
+    environment:
+      PORT: "8051"
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
+    expose: ["8051"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kx]
+
+  inflation:
+    build:
+      context: https://github.com/xkeecsai/inflation_indicators.git#main
+    container_name: inflation
+    restart: unless-stopped
+    environment:
+      PORT: "8052"
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      TRUFLATION_API_KEY: ${TRUFLATION_API_KEY:-}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
+    expose: ["8052"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kx]
+
+  seasonality:
+    build:
+      context: https://github.com/xkeecsai/seasonality.git#master
+    container_name: seasonality
+    restart: unless-stopped
+    environment:
+      PORT: "8501"
+    expose: ["8501"]
+    networks: [kx]
+
+  # ---------------------------------------------------------------------------
+  # Bloomberg gateway — placeholder. Uncomment once you have a working blpapi
+  # build context (need Bloomberg cpp/Python SDK + B-PIPE creds whitelisted).
+  # ---------------------------------------------------------------------------
+  # bbg-gateway:
+  #   build:
+  #     context: https://github.com/xkeecsai/bbg_gateway.git#main
+  #   container_name: bbg-gateway
+  #   restart: unless-stopped
+  #   environment:
+  #     BLOOMBERG_HOST: ${BLOOMBERG_HOST:-}
+  #     BLOOMBERG_PORT: ${BLOOMBERG_PORT:-8194}
+  #     DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
+  #   networks: [kx]
+
+  # ---------------------------------------------------------------------------
+  # Cron ingestor — pulls FRED + paid feeds nightly into Postgres. Lives in its
+  # own repo; uncomment + point at it once you've built that.
+  # ---------------------------------------------------------------------------
+  # ingestor:
+  #   build:
+  #     context: https://github.com/xkeecsai/data_ingestor.git#main
+  #   container_name: ingestor
+  #   restart: unless-stopped
+  #   environment:
+  #     FRED_API_KEY: ${FRED_API_KEY:-}
+  #     EODHD_API_KEY: ${EODHD_API_KEY:-}
+  #     TRUFLATION_API_KEY: ${TRUFLATION_API_KEY:-}
+  #     DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+  #   networks: [kx]
+
+volumes:
+  caddy_data:
+  caddy_config:
+  pg_data:
+
+networks:
+  kx:
+    driver: bridge

@@ -1,0 +1,7 @@
+.env
+.env.*
+!.env.example
+pg_backup/
+*.log
+__pycache__/
+.DS_Store
