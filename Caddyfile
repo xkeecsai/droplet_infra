@@ -1,14 +1,13 @@
-# Caddy auto-provisions Let's Encrypt certs and renews them. Just put a real
-# domain on the left and a docker-compose service:port on the right.
+# Caddy uses Cloudflare DNS-01 challenge for cert provisioning.
+# This means Let's Encrypt validates ownership via a DNS TXT record (placed
+# automatically by Caddy via the Cloudflare API), NOT via HTTP on port 80.
+# Result: certs work even though port 80 is closed to the public internet.
 #
-# Replace `kxmacro.com` with your actual domain (Cloudflare-bought etc.)
-# BEFORE first `docker compose up`. Caddy validates against the live DNS.
-#
-# Once you have more dashboards, add a block per subdomain — Caddy reloads
-# automatically on file change inside the container.
+# Replace `kxmacro.com` with your real domain (4 places). The CLOUDFLARE_API_TOKEN
+# env var must be set in .env (a token with "Zone:DNS:Edit" permission for the zone).
 {
-    # Optional: enable email for Let's Encrypt expiry notifications
     email admin@kxmacro.com
+    acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
 }
 
 liquidity.kxmacro.com {
@@ -47,8 +46,3 @@ seasonality.kxmacro.com {
         format console
     }
 }
-
-# Optional: a landing/redirect at the apex
-# kxmacro.com, www.kxmacro.com {
-#     redir https://liquidity.kxmacro.com{uri}
-# }

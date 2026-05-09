@@ -1,16 +1,24 @@
-# KX macro dashboards — Droplet orchestration.
+# KX macro dashboards — Droplet orchestration. Private-by-default.
 # All dashboards build from their own GitHub repos. Postgres + Caddy provided here.
 # `docker compose up -d --build` from /opt/kx/droplet_infra after bootstrap.sh.
+#
+# Privacy model: bootstrap.sh installs Tailscale and closes public ports 80/443.
+# Caddy's published ports remain on 0.0.0.0 inside the docker network, but the
+# host firewall only accepts traffic on the `tailscale0` interface. Caddy uses
+# Cloudflare DNS-01 challenge for certs — no public HTTP exposure required.
 
 services:
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: ./caddy           # custom build with Cloudflare DNS plugin
     container_name: caddy
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
-      - "443:443/udp"     # HTTP/3
+      - "443:443/udp"            # HTTP/3
+    environment:
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?must set CLOUDFLARE_API_TOKEN in .env}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -38,7 +46,6 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
-    # Postgres deliberately NOT exposed to host. Containers reach it via the kx network.
     networks: [kx]
 
   liquidity:
@@ -99,7 +106,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # Bloomberg gateway — placeholder. Uncomment once you have a working blpapi
-  # build context (need Bloomberg cpp/Python SDK + B-PIPE creds whitelisted).
+  # build context (Bloomberg cpp/Python SDK + B-PIPE creds whitelisted).
   # ---------------------------------------------------------------------------
   # bbg-gateway:
   #   build:
@@ -113,8 +120,7 @@ services:
   #   networks: [kx]
 
   # ---------------------------------------------------------------------------
-  # Cron ingestor — pulls FRED + paid feeds nightly into Postgres. Lives in its
-  # own repo; uncomment + point at it once you've built that.
+  # Cron ingestor — pulls FRED + paid feeds nightly into Postgres.
   # ---------------------------------------------------------------------------
   # ingestor:
   #   build:
