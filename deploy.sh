@@ -12,8 +12,11 @@ cd "$(dirname "$0")"
 log "Pulling droplet_infra..."
 git pull --ff-only
 
-log "Rebuilding services (forces re-clone of dashboard repos)..."
-docker compose build --pull --no-cache
+log "Pulling each dashboard repo..."
+./pull-dashboards.sh
+
+log "Rebuilding services..."
+docker compose build --pull
 
 log "Bringing services up..."
 docker compose up -d --remove-orphans

@@ -15,7 +15,10 @@ down: ## stop everything (keeps volumes)
 restart: ## restart all services
 	docker compose restart
 
-deploy: ## pull + rebuild + redeploy
+pull: ## clone or git-pull each dashboard repo
+	./pull-dashboards.sh
+
+deploy: ## pull all repos + rebuild + redeploy
 	./deploy.sh
 
 logs: ## tail logs (Ctrl-C to exit)
@@ -33,7 +36,4 @@ psql: ## open psql in the postgres container
 shell-%: ## shell into a service container, e.g. `make shell-liquidity`
 	docker compose exec $* /bin/bash || docker compose exec $* /bin/sh
 
-reload-caddy: ## reload Caddy config without restarting
-	docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
-
-.PHONY: help up down restart deploy logs ps backup psql reload-caddy
+.PHONY: help up down restart pull deploy logs ps backup psql

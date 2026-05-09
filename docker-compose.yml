@@ -57,7 +57,7 @@ services:
 
   liquidity:
     build:
-      context: https://github.com/xkeecsai/liquidity_indicators.git#main
+      context: /opt/kx/repos/liquidity_indicators
     container_name: liquidity
     restart: unless-stopped
     environment:
@@ -95,7 +95,7 @@ services:
 
   growth:
     build:
-      context: https://github.com/xkeecsai/growth_indicators_dash.git#main
+      context: /opt/kx/repos/growth_indicators_dash
     container_name: growth
     restart: unless-stopped
     environment:
@@ -133,7 +133,7 @@ services:
 
   inflation:
     build:
-      context: https://github.com/xkeecsai/inflation_indicators.git#main
+      context: /opt/kx/repos/inflation_indicators
     container_name: inflation
     restart: unless-stopped
     environment:
@@ -172,7 +172,7 @@ services:
 
   seasonality:
     build:
-      context: https://github.com/xkeecsai/seasonality.git#master
+      context: /opt/kx/repos/seasonality
     container_name: seasonality
     restart: unless-stopped
     environment:
