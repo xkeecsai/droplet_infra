@@ -183,6 +183,79 @@ services:
         condition: service_started
 
   # ─────────────────────────────────────────────────────────────────────────
+  # Polymarket smart-money mirror — dashboard + scheduler
+  # Dashboard on port 8053; scheduler runs as a background container with
+  # no public exposure (internal kx network only, reaches postgres).
+  # ─────────────────────────────────────────────────────────────────────────
+  ts-polymarket:
+    image: tailscale/tailscale:latest
+    container_name: ts-polymarket
+    hostname: polymarket
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?}
+      TS_HOSTNAME: polymarket
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "false"
+      TS_ENABLE_HEALTH_CHECK: "true"
+    volumes:
+      - ts-polymarket-state:/var/lib/tailscale
+      - ./tailscale/polymarket-serve.json:/config/serve.json:ro
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [NET_ADMIN, NET_RAW]
+    networks: [kx]
+
+  polymarket-dashboard:
+    build:
+      context: /opt/kx/repos/polymarket_analysis
+    container_name: polymarket-dashboard
+    restart: unless-stopped
+    environment:
+      PORT: "8053"
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/polymarket_sm
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_CLASSIFIER_MODEL: ${LLM_CLASSIFIER_MODEL:-claude-haiku-4-5}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["dashboard"]
+    network_mode: "service:ts-polymarket"
+    depends_on:
+      ts-polymarket:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+  polymarket-scheduler:
+    build:
+      context: /opt/kx/repos/polymarket_analysis
+    container_name: polymarket-scheduler
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/polymarket_sm
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_CLASSIFIER_MODEL: ${LLM_CLASSIFIER_MODEL:-claude-haiku-4-5}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      SMART_MONEY_MIN_CLOSED_MARKETS: ${SMART_MONEY_MIN_CLOSED_MARKETS:-10}
+      WATCHLIST_TOP_N_PER_CLUSTER: ${WATCHLIST_TOP_N_PER_CLUSTER:-20}
+      WATCHLIST_LOOKBACK_DAYS: ${WATCHLIST_LOOKBACK_DAYS:-90}
+      ALERT_SIZE_THRESHOLD_USD: ${ALERT_SIZE_THRESHOLD_USD:-10000}
+      ALERT_CLUSTER_M: ${ALERT_CLUSTER_M:-3}
+      ALERT_CLUSTER_WINDOW_HOURS: ${ALERT_CLUSTER_WINDOW_HOURS:-24}
+      WATCHLIST_POLL_INTERVAL_MIN: ${WATCHLIST_POLL_INTERVAL_MIN:-10}
+      DAILY_BATCH_HOUR_UTC: ${DAILY_BATCH_HOUR_UTC:-6}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["scheduler"]
+    networks: [kx]
+    depends_on:
+      polymarket-dashboard:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────────────────────
   # Bloomberg gateway — uncomment when you have blpapi access
   # ─────────────────────────────────────────────────────────────────────────
   # ts-bbg:
@@ -223,6 +296,7 @@ volumes:
   ts-growth-state:
   ts-inflation-state:
   ts-seasonality-state:
+  ts-polymarket-state:
   # ts-bbg-state:
 
 networks:

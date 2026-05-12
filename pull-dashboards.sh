@@ -18,6 +18,7 @@ declare -A REPOS=(
     [growth_indicators_dash]=main
     [inflation_indicators]=main
     [seasonality]=master
+    [polymarket_analysis]=main
 )
 
 log()  { printf "\033[1;32m[pull]\033[0m %s\n" "$*"; }
