@@ -26,6 +26,13 @@ rebuild-%: ## rebuild one container without re-pulling its repo
 restart-%: ## just restart one container (no rebuild)
 	docker compose restart $*
 
+# Explicit deploys where the service name doesn't match the repo name
+deploy-vol-tsunami: ## pull volatility_tsunami repo + rebuild vol-tsunami service
+	./pull-one.sh volatility_tsunami
+	docker compose build --pull vol-tsunami
+	docker compose up -d --no-deps vol-tsunami
+	@echo "[deploy-vol-tsunami] done. Check: docker compose logs vol-tsunami --tail=20"
+
 # ─────────────────────────────────────────────────────────────────────────
 # Full-stack ops
 # ─────────────────────────────────────────────────────────────────────────
@@ -70,4 +77,4 @@ shell-%: ## shell into a service container, e.g. `make shell-liquidity`
 stats: ## live CPU/RAM per container
 	docker stats
 
-.PHONY: help up down restart pull deploy logs ps backup psql stats
+.PHONY: help up down restart pull deploy logs ps backup psql stats deploy-vol-tsunami

@@ -99,15 +99,17 @@ nano .env       # set POSTGRES_PASSWORD + paste TS_AUTHKEY (same one as bootstra
 docker compose up -d --build
 ```
 
-First build: ~5 minutes (clones + builds 4 dashboards, pulls Tailscale image, joins each sidecar to your tailnet). After this completes, in your Tailscale admin you'll see 5 devices: `kx-macro`, `liquidity`, `growth`, `inflation`, `seasonality`.
+First build: ~5 minutes (clones + builds the dashboards, pulls Tailscale image, joins each sidecar to your tailnet). After this completes, in your Tailscale admin you'll see the host + one device per dashboard: `kx-macro`, `liquidity`, `growth`, `inflation`, `seasonality`, `polymarket`, `vol-tsunami`.
 
 Tailscale Serve provisions HTTPS certs for each in the background. Wait ~30 seconds and:
 
 ```
-https://liquidity.<your-tailnet>.ts.net   ✅
-https://growth.<your-tailnet>.ts.net      ✅
-https://inflation.<your-tailnet>.ts.net   ✅
-https://seasonality.<your-tailnet>.ts.net ✅
+https://liquidity.<your-tailnet>.ts.net    ✅
+https://growth.<your-tailnet>.ts.net       ✅
+https://inflation.<your-tailnet>.ts.net    ✅
+https://seasonality.<your-tailnet>.ts.net  ✅
+https://polymarket.<your-tailnet>.ts.net   ✅
+https://vol-tsunami.<your-tailnet>.ts.net  ✅
 ```
 
 Find your tailnet name in the Tailscale admin sidebar (looks like `tail-xxxx.ts.net` or your custom alias).
@@ -229,3 +231,5 @@ docker compose exec -T postgres pg_restore --username kx --dbname macro \
 - [growth_indicators_dash](https://github.com/xkeecsai/growth_indicators_dash)
 - [inflation_indicators](https://github.com/xkeecsai/inflation_indicators)
 - [seasonality](https://github.com/xkeecsai/seasonality)
+- [polymarket_analysis](https://github.com/xkeecsai/polymarket_analysis)
+- [volatility_tsunami](https://github.com/xkeecsai/volatility_tsunami) — Thrasher (2017) compressed-VIX-dispersion signal. The source for the sister repo currently lives at `volatility_tsunami/` in this repo; extract it to its own `xkeecsai/volatility_tsunami` repo and `make deploy-vol-tsunami` will pull from there.
