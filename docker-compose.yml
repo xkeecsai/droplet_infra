@@ -284,10 +284,13 @@ services:
     restart: unless-stopped
     environment:
       PORT: "8054"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
     network_mode: "service:ts-macrodash"
     depends_on:
       ts-macrodash:
         condition: service_started
+      postgres:
+        condition: service_healthy
 
   # ─────────────────────────────────────────────────────────────────────────
   # Bloomberg gateway — uncomment when you have blpapi access
