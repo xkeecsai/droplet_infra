@@ -206,6 +206,24 @@ services:
     cap_add: [NET_ADMIN, NET_RAW]
     networks: [kx]
 
+  # One-shot migration gate (DEF-3). Creates polymarket_sm if missing and runs
+  # `alembic upgrade head`, then exits 0. Both the dashboard and scheduler wait
+  # for this to COMPLETE SUCCESSFULLY before starting, so they never race on the
+  # schema and never run alembic concurrently.
+  polymarket-migrate:
+    build:
+      context: /opt/kx/repos/polymarket_analysis
+    container_name: polymarket-migrate
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/polymarket_sm
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["migrate"]
+    networks: [kx]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   polymarket-dashboard:
     build:
       context: /opt/kx/repos/polymarket_analysis
@@ -214,6 +232,8 @@ services:
     environment:
       PORT: "8053"
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/polymarket_sm
+      # Migrations are owned by polymarket-migrate; skip them here to avoid a race.
+      SKIP_MIGRATIONS: "true"
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       LLM_CLASSIFIER_MODEL: ${LLM_CLASSIFIER_MODEL:-claude-haiku-4-5}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
@@ -226,6 +246,8 @@ services:
         condition: service_started
       postgres:
         condition: service_healthy
+      polymarket-migrate:
+        condition: service_completed_successfully
 
   polymarket-scheduler:
     build:
@@ -234,6 +256,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/polymarket_sm
+      SKIP_MIGRATIONS: "true"
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       LLM_CLASSIFIER_MODEL: ${LLM_CLASSIFIER_MODEL:-claude-haiku-4-5}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
@@ -241,6 +264,7 @@ services:
       SMART_MONEY_MIN_CLOSED_MARKETS: ${SMART_MONEY_MIN_CLOSED_MARKETS:-10}
       WATCHLIST_TOP_N_PER_CLUSTER: ${WATCHLIST_TOP_N_PER_CLUSTER:-20}
       WATCHLIST_LOOKBACK_DAYS: ${WATCHLIST_LOOKBACK_DAYS:-90}
+      SNAPSHOT_PRIOR_LOOKBACK_DAYS: ${SNAPSHOT_PRIOR_LOOKBACK_DAYS:-30}
       ALERT_SIZE_THRESHOLD_USD: ${ALERT_SIZE_THRESHOLD_USD:-10000}
       ALERT_CLUSTER_M: ${ALERT_CLUSTER_M:-3}
       ALERT_CLUSTER_WINDOW_HOURS: ${ALERT_CLUSTER_WINDOW_HOURS:-24}
@@ -250,10 +274,10 @@ services:
     command: ["scheduler"]
     networks: [kx]
     depends_on:
-      polymarket-dashboard:
-        condition: service_started
       postgres:
         condition: service_healthy
+      polymarket-migrate:
+        condition: service_completed_successfully
 
   # ─────────────────────────────────────────────────────────────────────────
   # MacroDash — Plotly Dash replica of macroodash.vercel.app
