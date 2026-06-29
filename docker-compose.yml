@@ -317,6 +317,41 @@ services:
         condition: service_healthy
 
   # ─────────────────────────────────────────────────────────────────────────
+  # Momentum screener (Streamlit) — cross-asset momentum; roll-adjusted
+  # continuous futures via Databento (falls back to yfinance if the key is unset)
+  # ─────────────────────────────────────────────────────────────────────────
+  ts-momentum:
+    image: tailscale/tailscale:latest
+    container_name: ts-momentum
+    hostname: momentum
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?}
+      TS_HOSTNAME: momentum
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "false"
+      TS_ENABLE_HEALTH_CHECK: "true"
+    volumes:
+      - ts-momentum-state:/var/lib/tailscale
+      - ./tailscale/momentum-serve.json:/config/serve.json:ro
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [NET_ADMIN, NET_RAW]
+    networks: [kx]
+
+  momentum:
+    build:
+      context: /opt/kx/repos/momentum_screener_assets
+    container_name: momentum
+    restart: unless-stopped
+    environment:
+      DATABENTO_API_KEY: ${DATABENTO_API_KEY:-}
+    network_mode: "service:ts-momentum"
+    depends_on:
+      ts-momentum:
+        condition: service_started
+
+  # ─────────────────────────────────────────────────────────────────────────
   # Bloomberg gateway — uncomment when you have blpapi access
   # ─────────────────────────────────────────────────────────────────────────
   # ts-bbg:
@@ -359,6 +394,7 @@ volumes:
   ts-seasonality-state:
   ts-polymarket-state:
   ts-macrodash-state:
+  ts-momentum-state:
   # ts-bbg-state:
 
 networks:
