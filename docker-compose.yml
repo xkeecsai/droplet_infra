@@ -352,6 +352,42 @@ services:
         condition: service_started
 
   # ─────────────────────────────────────────────────────────────────────────
+  # USD Funding & Collateral Plumbing Cockpit (Dash) — NY Fed + FRED, keyless
+  # ─────────────────────────────────────────────────────────────────────────
+  ts-plumbing:
+    image: tailscale/tailscale:latest
+    container_name: ts-plumbing
+    hostname: plumbing
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?}
+      TS_HOSTNAME: plumbing
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "false"
+      TS_ENABLE_HEALTH_CHECK: "true"
+    volumes:
+      - ts-plumbing-state:/var/lib/tailscale
+      - ./tailscale/plumbing-serve.json:/config/serve.json:ro
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [NET_ADMIN, NET_RAW]
+    networks: [kx]
+
+  plumbing:
+    build:
+      context: /opt/kx/repos/usd-funding-plumbing-cockpit
+    container_name: plumbing
+    restart: unless-stopped
+    environment:
+      PORT: "8055"
+    volumes:
+      - plumbing-cache:/app/data_cache
+    network_mode: "service:ts-plumbing"
+    depends_on:
+      ts-plumbing:
+        condition: service_started
+
+  # ─────────────────────────────────────────────────────────────────────────
   # Bloomberg gateway — uncomment when you have blpapi access
   # ─────────────────────────────────────────────────────────────────────────
   # ts-bbg:
@@ -395,6 +431,8 @@ volumes:
   ts-polymarket-state:
   ts-macrodash-state:
   ts-momentum-state:
+  ts-plumbing-state:
+  plumbing-cache:
   # ts-bbg-state:
 
 networks:
