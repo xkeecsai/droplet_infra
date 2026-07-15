@@ -17,8 +17,15 @@ refresh_status=$?
 
 # The app loads its immutable runtime context at process start. Restart even on
 # a failed refresh so Runtime Status surfaces the scheduler's failure record.
-docker compose up -d --no-deps --force-recreate g10-cb-intel
+service_status=0
+docker compose up -d --no-deps ts-g10-cb-intel || service_status=$?
+docker compose up -d --no-deps --force-recreate g10-cb-intel || service_status=$?
+
+final_status=$refresh_status
+if [[ $final_status -eq 0 && $service_status -ne 0 ]]; then
+    final_status=$service_status
+fi
 
 completed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-echo "[g10-cb-intel-refresh] completed_at=$completed_at status=$refresh_status"
-exit "$refresh_status"
+echo "[g10-cb-intel-refresh] completed_at=$completed_at refresh_status=$refresh_status service_status=$service_status status=$final_status"
+exit "$final_status"
