@@ -1,0 +1,5 @@
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# 04:30 UTC / 08:30 Dubai. docker compose run is synchronous and foreground.
+30 4 * * * root /opt/kx/droplet_infra/refresh-g10-cb-intel.sh >> /var/log/g10-cb-intel-refresh.log 2>&1

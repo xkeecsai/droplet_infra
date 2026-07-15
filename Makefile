@@ -19,6 +19,15 @@ deploy-%: ## pull + rebuild + restart one dashboard, e.g. `make deploy-liquidity
 	docker compose up -d --no-deps $*
 	@echo "[deploy-$*] done. Check: docker compose logs $* --tail=20"
 
+deploy-g10-cb-intel: ## pull app + pricer, refresh live data, deploy, and install daily schedule
+	@./pull-one.sh g10_cb_intel
+	@./pull-one.sh g10_ois_meeting_pricer
+	docker compose build --pull g10-cb-intel
+	@./refresh-g10-cb-intel.sh
+	docker compose up -d --no-deps ts-g10-cb-intel g10-cb-intel
+	@install -m 0644 cron/g10-cb-intel /etc/cron.d/g10-cb-intel
+	@echo "[deploy-g10-cb-intel] https://g10-cb-intel.$${TAILNET_DOMAIN:-tail284e0d.ts.net}"
+
 rebuild-%: ## rebuild one container without re-pulling its repo
 	docker compose build --no-cache $*
 	docker compose up -d --no-deps --force-recreate $*
@@ -70,4 +79,4 @@ shell-%: ## shell into a service container, e.g. `make shell-liquidity`
 stats: ## live CPU/RAM per container
 	docker stats
 
-.PHONY: help up down restart pull deploy logs ps backup psql stats
+.PHONY: help up down restart pull deploy deploy-g10-cb-intel logs ps backup psql stats

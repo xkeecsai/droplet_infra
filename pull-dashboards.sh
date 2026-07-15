@@ -22,6 +22,8 @@ declare -A REPOS=(
     [momentum_screener_assets]=codex/trend-following-dashboard
     [usd-funding-plumbing-cockpit]=main
     [dealer-repo-fragility-monitor]=main
+    [g10_cb_intel]=main
+    [g10_ois_meeting_pricer]=main
 )
 
 log()  { printf "\033[1;32m[pull]\033[0m %s\n" "$*"; }

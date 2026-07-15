@@ -128,6 +128,7 @@ make ps                # docker compose ps
 make psql              # psql shell into the database
 make backup            # one-off Postgres dump → pg_backup/
 make shell-liquidity   # bash into a specific container
+make deploy-g10-cb-intel # pull app + pricer, foreground refresh, deploy, install cron
 ```
 
 ### Schedule daily backups
@@ -136,6 +137,17 @@ make shell-liquidity   # bash into a specific container
 # crontab -e
 0 3 * * *  cd /opt/kx/droplet_infra && ./backup.sh > /var/log/kx-backup.log 2>&1
 ```
+
+### G10 Central Bank Intelligence
+
+The private service is `https://g10-cb-intel.<tailnet>.ts.net` and defaults to port `8067`. Its operational image installs curl, serves `app:server` with Gunicorn, and shares durable snapshot/pricer-cache volumes with the refresh job.
+
+```bash
+make deploy-g10-cb-intel
+curl --fail https://g10-cb-intel.<tailnet>.ts.net/healthz
+```
+
+`cron/g10-cb-intel` runs the synchronous foreground refresh at `04:30 UTC` (`08:30 Dubai`) and logs to `/var/log/g10-cb-intel-refresh.log`. The deploy target installs it in `/etc/cron.d/g10-cb-intel`. Every run archives a provenance manifest under the dashboard data volume, preserves prior accumulated history on a failed fetch, and restarts the app so Runtime Status reports the outcome.
 
 ### Add a new dashboard
 
