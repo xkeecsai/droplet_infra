@@ -19,6 +19,7 @@ declare -A REPOS=(
     [momentum_screener_assets]=codex/trend-following-dashboard
     [usd-funding-plumbing-cockpit]=main
     [dealer-repo-fragility-monitor]=main
+    [jgb-demand]=main
     [g10_cb_intel]=main
     [g10_ois_meeting_pricer]=main
 )
