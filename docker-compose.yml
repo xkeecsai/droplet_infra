@@ -579,6 +579,44 @@ services:
         condition: service_started
 
   # ─────────────────────────────────────────────────────────────────────────
+  # EUR Excess Liquidity Monitor (Dash) — ECB Data Portal, keyless
+  # ESTR-DFR scarcity model + OMO-takeup tripwire
+  # ─────────────────────────────────────────────────────────────────────────
+  ts-eur-liquidity:
+    image: tailscale/tailscale:latest
+    container_name: ts-eur-liquidity
+    hostname: eur-liquidity
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?}
+      TS_HOSTNAME: eur-liquidity
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "false"
+      TS_ENABLE_HEALTH_CHECK: "true"
+    volumes:
+      - ts-eur-liquidity-state:/var/lib/tailscale
+      - ./tailscale/eur-liquidity-serve.json:/config/serve.json:ro
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [NET_ADMIN, NET_RAW]
+    networks: [kx]
+
+  eur-liquidity:
+    build:
+      context: /opt/kx/repos/eur-excess-liquidity-monitor
+    container_name: eur-liquidity
+    restart: unless-stopped
+    environment:
+      PORT: "8057"
+      CACHE_MAX_AGE_H: "6"
+    volumes:
+      - eur-liquidity-cache:/app/data_cache
+    network_mode: "service:ts-eur-liquidity"
+    depends_on:
+      ts-eur-liquidity:
+        condition: service_started
+
+  # ─────────────────────────────────────────────────────────────────────────
   # Bloomberg gateway — uncomment when you have blpapi access
   # ─────────────────────────────────────────────────────────────────────────
   # ts-bbg:
@@ -719,6 +757,8 @@ volumes:
   g10-cb-intel-data:
   g10-ois-pricer-cache:
   ts-ib-risk-state:
+  ts-eur-liquidity-state:
+  eur-liquidity-cache:
   # ts-bbg-state:
 
 networks:
