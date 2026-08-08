@@ -814,6 +814,11 @@ services:
     depends_on:
       korea-leverage:
         condition: service_started
+    # It inherits the image HEALTHCHECK, which curls the web server this
+    # container does not run -- so it would sit "unhealthy" forever and teach
+    # us to ignore the health column. Its liveness is the refresh log.
+    healthcheck:
+      disable: true
     command:
       - /bin/sh
       - -c
