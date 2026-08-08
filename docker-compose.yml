@@ -738,7 +738,22 @@ services:
   # margin cycle off KOFIA FreeSIS + Naver. DESCRIPTIVE ONLY: the completed
   # pre-registered backtest validated 0 of 40 objects, and the page says so.
   # ─────────────────────────────────────────────────────────────────────────
+  # PARKED. The shared TS_AUTHKEY in .env has EXPIRED ("invalid key: API key
+  # ... not valid"), so this sidecar cannot register a new node. Existing
+  # sidecars are unaffected -- they already hold node state in their volumes;
+  # only NEW nodes need the key. Until a fresh key is issued, korea-leverage
+  # binds to the droplet's own tailnet IP instead (see below).
+  #
+  # TO RESTORE the proper https://korea-leverage.<tailnet>.ts.net URL:
+  #   1. new reusable, non-ephemeral, pre-approved key at
+  #      https://login.tailscale.com/admin/settings/keys
+  #   2. put it in /opt/kx/droplet_infra/.env as TS_AUTHKEY=...
+  #   3. delete this `profiles:` line and the `ports:`/`networks:` lines on
+  #      korea-leverage, restore `network_mode: "service:ts-korea-leverage"`
+  #      plus its depends_on, then `docker compose up -d ts-korea-leverage
+  #      korea-leverage`
   ts-korea-leverage:
+    profiles: ["tailnet-node"]
     image: tailscale/tailscale:latest
     container_name: ts-korea-leverage
     hostname: korea-leverage
@@ -772,10 +787,12 @@ services:
       # The PIT archive is append-only and is the source of truth. The image
       # seeds it ONLY when empty, so a rebuild can never roll it back.
       - korea-leverage-data:/data
-    network_mode: "service:ts-korea-leverage"
-    depends_on:
-      ts-korea-leverage:
-        condition: service_started
+    # INTERIM (see the ts-korea-leverage note above). Bound to the droplet's
+    # OWN tailnet address, so it is reachable from tailnet devices only -- the
+    # public firewall allows nothing but SSH. NOT 0.0.0.0.
+    ports:
+      - "${KX_TAILNET_IP:-100.78.25.100}:8148:8148"
+    networks: [kx]
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8148/healthz >/dev/null || exit 1"]
       interval: 60s
