@@ -28,6 +28,7 @@ declare -A REPOS=(
     [es_nq_session_monitor]=main
     [eur-excess-liquidity-monitor]=main
     [korea_equity_positioning]=main
+    [mpr_rules_panel]=main
 )
 
 log()  { printf "\033[1;32m[pull]\033[0m %s\n" "$*"; }
