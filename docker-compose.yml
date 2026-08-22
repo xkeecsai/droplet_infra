@@ -280,41 +280,46 @@ services:
         condition: service_completed_successfully
 
   # ─────────────────────────────────────────────────────────────────────────
-  # MacroDash — Plotly Dash replica of macroodash.vercel.app
-  # ─────────────────────────────────────────────────────────────────────────
-  ts-macrodash:
-    image: tailscale/tailscale:latest
-    container_name: ts-macrodash
-    hostname: macrodash
-    restart: unless-stopped
-    environment:
-      TS_AUTHKEY: ${TS_AUTHKEY:?}
-      TS_HOSTNAME: macrodash
-      TS_STATE_DIR: /var/lib/tailscale
-      TS_SERVE_CONFIG: /config/serve.json
-      TS_USERSPACE: "false"
-      TS_ENABLE_HEALTH_CHECK: "true"
-    volumes:
-      - ts-macrodash-state:/var/lib/tailscale
-      - ./tailscale/macrodash-serve.json:/config/serve.json:ro
-      - /dev/net/tun:/dev/net/tun
-    cap_add: [NET_ADMIN, NET_RAW]
-    networks: [kx]
-
-  macrodash:
-    build:
-      context: /opt/kx/repos/macrodash
-    container_name: macrodash
-    restart: unless-stopped
-    environment:
-      PORT: "8054"
-      DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
-    network_mode: "service:ts-macrodash"
-    depends_on:
-      ts-macrodash:
-        condition: service_started
-      postgres:
-        condition: service_healthy
+  # ═══ RETIRED 2026-08-22 (CB dashboard triage) ═══════════════════════════
+  # macrodash cannot build: its build context /opt/kx/repos/macrodash does
+  # not exist on the droplet and no image was ever created. It was listed as
+  # a deployed-but-down app while never having been deployable at all.
+  # ════════════════════════════════════════════════════════════════════════
+#   # MacroDash — Plotly Dash replica of macroodash.vercel.app
+#   # ─────────────────────────────────────────────────────────────────────────
+#   ts-macrodash:
+#     image: tailscale/tailscale:latest
+#     container_name: ts-macrodash
+#     hostname: macrodash
+#     restart: unless-stopped
+#     environment:
+#       TS_AUTHKEY: ${TS_AUTHKEY:?}
+#       TS_HOSTNAME: macrodash
+#       TS_STATE_DIR: /var/lib/tailscale
+#       TS_SERVE_CONFIG: /config/serve.json
+#       TS_USERSPACE: "false"
+#       TS_ENABLE_HEALTH_CHECK: "true"
+#     volumes:
+#       - ts-macrodash-state:/var/lib/tailscale
+#       - ./tailscale/macrodash-serve.json:/config/serve.json:ro
+#       - /dev/net/tun:/dev/net/tun
+#     cap_add: [NET_ADMIN, NET_RAW]
+#     networks: [kx]
+#
+#   macrodash:
+#     build:
+#       context: /opt/kx/repos/macrodash
+#     container_name: macrodash
+#     restart: unless-stopped
+#     environment:
+#       PORT: "8054"
+#       DATABASE_URL: postgresql://${POSTGRES_USER:-kx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-macro}
+#     network_mode: "service:ts-macrodash"
+#     depends_on:
+#       ts-macrodash:
+#         condition: service_started
+#       postgres:
+#         condition: service_healthy
 
   # ─────────────────────────────────────────────────────────────────────────
   # Momentum screener (Streamlit) — cross-asset momentum; roll-adjusted
@@ -459,84 +464,102 @@ services:
       ts-cb-speeches:
         condition: service_started
 
-  # ─────────────────────────────────────────────────────────────────────────
-  # G10 Central Bank Intelligence — live policy path and decision monitor
-  # ─────────────────────────────────────────────────────────────────────────
-  ts-g10-cb-intel:
-    image: tailscale/tailscale:latest
-    container_name: ts-g10-cb-intel
-    hostname: g10-cb-intel
-    restart: unless-stopped
-    environment:
-      TS_AUTHKEY: ${TS_AUTHKEY:?}
-      TS_HOSTNAME: g10-cb-intel
-      TS_STATE_DIR: /var/lib/tailscale
-      TS_SERVE_CONFIG: /config/serve.json
-      TS_USERSPACE: "false"
-      TS_ENABLE_HEALTH_CHECK: "true"
-    volumes:
-      - ts-g10-cb-intel-state:/var/lib/tailscale
-      - ./tailscale/g10-cb-intel-serve.json:/config/serve.json:ro
-      - /dev/net/tun:/dev/net/tun
-    cap_add: [NET_ADMIN, NET_RAW]
-    networks: [kx]
-
-  g10-cb-intel:
-    image: kx-g10-cb-intel:latest
-    build:
-      context: /opt/kx/repos/g10_cb_intel
-      dockerfile: Dockerfile.ops
-      additional_contexts:
-        pricer: /opt/kx/repos/g10_ois_meeting_pricer
-    container_name: g10-cb-intel
-    restart: unless-stopped
-    environment: &g10-cb-intel-environment
-      G10_CB_INTEL_HOST: "0.0.0.0"
-      G10_CB_INTEL_PORT: ${G10_CB_INTEL_PORT:-8067}
-      G10_CB_INTEL_WORKERS: ${G10_CB_INTEL_WORKERS:-2}
-      G10_CB_INTEL_IMPORT_DIR: /data/real_imports/latest
-      G10_CB_INTEL_REFRESH_ROOT: /data/refresh
-      G10_CB_INTEL_CACHE_ROOT: /data/cache
-      G10_OIS_PRICER_ROOT: /app/g10_ois_meeting_pricer
-      G10_OIS_PRICER_OUTPUT_DIR: /data/ois_pricer
-      G10_OIS_PRICER_PYTHON: /usr/local/bin/python
-      G10_CB_INTEL_DIVERGENCE_DIR: /data/divergence
-      G10_CB_INTEL_SIGNAL_BUS_PATH: /data/signals/latest.jsonl
-      CB_SPEECHES_STORE_DIR: /data/cb_speeches
-    volumes:
-      - g10-cb-intel-data:/data
-      - g10-ois-pricer-cache:/app/g10_ois_meeting_pricer/data_cache
-      - cb-speeches-cache:/data/cb_speeches:ro
-    network_mode: "service:ts-g10-cb-intel"
-    depends_on:
-      ts-g10-cb-intel:
-        condition: service_started
-    healthcheck:
-      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:$${G10_CB_INTEL_PORT}/healthz >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-
-  # Invoked synchronously by refresh-g10-cb-intel.sh. It deliberately keeps a
-  # normal bridge network because refreshes need foreground public-data egress.
-  g10-cb-intel-refresh:
-    image: kx-g10-cb-intel:latest
-    profiles: ["refresh"]
-    restart: "no"
-    environment: *g10-cb-intel-environment
-    command:
-      - python
-      - scripts/run_daily_refresh.py
-      - --repo-root
-      - /app/trading-research
-      - --pricer-root
-      - /app/g10_ois_meeting_pricer
-    volumes:
-      - g10-cb-intel-data:/data
-      - g10-ois-pricer-cache:/app/g10_ois_meeting_pricer/data_cache
-      - cb-speeches-cache:/data/cb_speeches:ro
-    networks: [kx]
+  # ═══ RETIRED 2026-08-22 (CB dashboard triage) ═══════════════════════════
+  # g10-cb-intel was defined here but NEVER deployed on this droplet: no
+  # image, no container, no volumes, and no `g10-cb-intel` node ever joined
+  # the tailnet (the public URL was NXDOMAIN, not merely down).
+  # TWO independent blockers:
+  #  1. TS_AUTHKEY in .env is dead ('invalid key: API key does not exist'),
+  #     so a NEW sidecar cannot register. Existing sidecars only survive on
+  #     their persisted ts-*-state volumes; g10 has no such volume.
+  #  2. /opt/kx/repos/g10_cb_intel is pinned to GitHub xkeecsai/g10_cb_intel
+  #     @ 8171997 (2026-07-15), a FROZEN extraction. The maintained code
+  #     lives in the MacMini monorepo trading-research/dashboards/g10_cb_intel
+  #     and is ~5 weeks ahead. Building this fork would ship known-wrong
+  #     output: the float(nan):.0f headline-KPI bug, the pack5_overlays
+  #     clobber (Economics Cockpit renders EMPTY after every refresh while
+  #     reporting status ok), no BOE curve-fitted path, no Polymarket ECB leg.
+  # To revive: refresh TS_AUTHKEY, then publish current monorepo code to a
+  # deployable repo. Do NOT rebuild from the frozen fork.
+  # ════════════════════════════════════════════════════════════════════════
+#   # ─────────────────────────────────────────────────────────────────────────
+#   # G10 Central Bank Intelligence — live policy path and decision monitor
+#   # ─────────────────────────────────────────────────────────────────────────
+#   ts-g10-cb-intel:
+#     image: tailscale/tailscale:latest
+#     container_name: ts-g10-cb-intel
+#     hostname: g10-cb-intel
+#     restart: unless-stopped
+#     environment:
+#       TS_AUTHKEY: ${TS_AUTHKEY:?}
+#       TS_HOSTNAME: g10-cb-intel
+#       TS_STATE_DIR: /var/lib/tailscale
+#       TS_SERVE_CONFIG: /config/serve.json
+#       TS_USERSPACE: "false"
+#       TS_ENABLE_HEALTH_CHECK: "true"
+#     volumes:
+#       - ts-g10-cb-intel-state:/var/lib/tailscale
+#       - ./tailscale/g10-cb-intel-serve.json:/config/serve.json:ro
+#       - /dev/net/tun:/dev/net/tun
+#     cap_add: [NET_ADMIN, NET_RAW]
+#     networks: [kx]
+#
+#   g10-cb-intel:
+#     image: kx-g10-cb-intel:latest
+#     build:
+#       context: /opt/kx/repos/g10_cb_intel
+#       dockerfile: Dockerfile.ops
+#       additional_contexts:
+#         pricer: /opt/kx/repos/g10_ois_meeting_pricer
+#     container_name: g10-cb-intel
+#     restart: unless-stopped
+#     environment: &g10-cb-intel-environment
+#       G10_CB_INTEL_HOST: "0.0.0.0"
+#       G10_CB_INTEL_PORT: ${G10_CB_INTEL_PORT:-8067}
+#       G10_CB_INTEL_WORKERS: ${G10_CB_INTEL_WORKERS:-2}
+#       G10_CB_INTEL_IMPORT_DIR: /data/real_imports/latest
+#       G10_CB_INTEL_REFRESH_ROOT: /data/refresh
+#       G10_CB_INTEL_CACHE_ROOT: /data/cache
+#       G10_OIS_PRICER_ROOT: /app/g10_ois_meeting_pricer
+#       G10_OIS_PRICER_OUTPUT_DIR: /data/ois_pricer
+#       G10_OIS_PRICER_PYTHON: /usr/local/bin/python
+#       G10_CB_INTEL_DIVERGENCE_DIR: /data/divergence
+#       G10_CB_INTEL_SIGNAL_BUS_PATH: /data/signals/latest.jsonl
+#       CB_SPEECHES_STORE_DIR: /data/cb_speeches
+#     volumes:
+#       - g10-cb-intel-data:/data
+#       - g10-ois-pricer-cache:/app/g10_ois_meeting_pricer/data_cache
+#       - cb-speeches-cache:/data/cb_speeches:ro
+#     network_mode: "service:ts-g10-cb-intel"
+#     depends_on:
+#       ts-g10-cb-intel:
+#         condition: service_started
+#     healthcheck:
+#       test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:$${G10_CB_INTEL_PORT}/healthz >/dev/null || exit 1"]
+#       interval: 30s
+#       timeout: 5s
+#       retries: 3
+#       start_period: 20s
+#
+#   # Invoked synchronously by refresh-g10-cb-intel.sh. It deliberately keeps a
+#   # normal bridge network because refreshes need foreground public-data egress.
+#   g10-cb-intel-refresh:
+#     image: kx-g10-cb-intel:latest
+#     profiles: ["refresh"]
+#     restart: "no"
+#     environment: *g10-cb-intel-environment
+#     command:
+#       - python
+#       - scripts/run_daily_refresh.py
+#       - --repo-root
+#       - /app/trading-research
+#       - --pricer-root
+#       - /app/g10_ois_meeting_pricer
+#     volumes:
+#       - g10-cb-intel-data:/data
+#       - g10-ois-pricer-cache:/app/g10_ois_meeting_pricer/data_cache
+#       - cb-speeches-cache:/data/cb_speeches:ro
+#     networks: [kx]
 
   # ─────────────────────────────────────────────────────────────────────────
   # IB Risk (RISK-001) — PA portfolio risk, PUBLISHED aggregates-only tier.
@@ -872,7 +895,7 @@ volumes:
   ts-inflation-state:
   ts-seasonality-state:
   ts-polymarket-state:
-  ts-macrodash-state:
+#   ts-macrodash-state:   #  [RETIRED 2026-08-22 — see AI-GEN/2026-08-22-CB-Dashboard-Triage.md]
   ts-momentum-state:
   ts-plumbing-state:
   plumbing-cache:
@@ -880,9 +903,9 @@ volumes:
   fragility-cache:
   ts-cb-speeches-state:
   cb-speeches-cache:
-  ts-g10-cb-intel-state:
-  g10-cb-intel-data:
-  g10-ois-pricer-cache:
+#   ts-g10-cb-intel-state:   #  [RETIRED 2026-08-22 — see AI-GEN/2026-08-22-CB-Dashboard-Triage.md]
+#   g10-cb-intel-data:   #  [RETIRED 2026-08-22 — see AI-GEN/2026-08-22-CB-Dashboard-Triage.md]
+#   g10-ois-pricer-cache:   #  [RETIRED 2026-08-22 — see AI-GEN/2026-08-22-CB-Dashboard-Triage.md]
   ts-ib-risk-state:
   ts-eur-liquidity-state:
   eur-liquidity-cache:
