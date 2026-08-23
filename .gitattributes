@@ -1,0 +1,13 @@
+# This repo is checked out on Windows (claude_kai) but every script executes on a
+# Linux droplet. Without this, a Windows checkout rewrites shell scripts to CRLF and
+# they fail on the box with: bad interpreter: /usr/bin/env bash^M
+#
+# Force LF for everything that runs remotely.
+*.sh            text eol=lf
+Makefile        text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+Dockerfile      text eol=lf
+
+# /etc/cron.d entries are parsed by cron on Linux; CRLF breaks them silently.
+cron/*          text eol=lf
