@@ -1,0 +1,6 @@
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# 02:00 UTC / 06:00 Dubai. The run takes ~11-13 min, so the corpus is current
+# before the 07:00 Dubai slot it serves. Foreground + flock-guarded.
+0 2 * * * root /opt/kx/droplet_infra/refresh-cb-speeches.sh >> /var/log/cb-speeches-refresh.log 2>&1

@@ -28,6 +28,13 @@ deploy-g10-cb-intel: ## pull app + pricer, refresh live data, deploy, and instal
 	@install -m 0644 cron/g10-cb-intel /etc/cron.d/g10-cb-intel
 	@echo "[deploy-g10-cb-intel] https://g10-cb-intel.$${TAILNET_DOMAIN:-tail284e0d.ts.net}"
 
+schedule-cb-speeches: ## install the daily cb-speeches refresh (02:00 UTC / 06:00 Dubai)
+	@install -m 0755 refresh-cb-speeches.sh /opt/kx/droplet_infra/refresh-cb-speeches.sh
+	@install -m 0644 cron/cb-speeches /etc/cron.d/cb-speeches
+	@systemctl restart cron
+	@echo "[schedule-cb-speeches] installed. Verify: run ./refresh-cb-speeches.sh once,"
+	@echo "[schedule-cb-speeches] then check source_health.json -> latest_content_at (NOT status)."
+
 rebuild-%: ## rebuild one container without re-pulling its repo
 	docker compose build --no-cache $*
 	docker compose up -d --no-deps --force-recreate $*
