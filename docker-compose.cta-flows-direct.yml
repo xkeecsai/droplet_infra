@@ -13,8 +13,10 @@
 #
 #     https://kx-macro.tail284e0d.ts.net:8443
 #
-# The container binds 127.0.0.1 ONLY, so the app has exactly one entry point and
-# is not reachable even on the tailnet except through the served endpoint.
+# The container binds loopback (for the serve proxy) AND the host tailnet IP, so
+# both of these work and neither is public:
+#     https://kx-macro.tail284e0d.ts.net:8443   (HTTPS, real cert)
+#     http://100.78.25.100:8058                 (plain, same box)
 #
 # Set up once on the host (persists in tailscaled state across restarts):
 #     tailscale serve --bg --https=8443 http://127.0.0.1:8058
@@ -38,4 +40,10 @@ services:
     networks: [kx]
     depends_on: !reset []
     ports:
+      # BOTH: loopback for `tailscale serve` to proxy, and the host's tailnet IP
+      # so the plain http://100.78.25.100:8058 URL keeps working. Both are
+      # tailnet-only -- neither is reachable from the public internet -- so
+      # there is no exposure cost to keeping the second, and removing it broke
+      # a URL that had already been handed out.
       - "127.0.0.1:8058:8058"
+      - "100.78.25.100:8058:8058"
