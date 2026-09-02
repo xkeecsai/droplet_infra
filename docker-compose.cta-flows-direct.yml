@@ -1,25 +1,33 @@
-# INTERIM override for cta-flows — serve on the host's tailnet IP directly,
-# with no Tailscale sidecar.
+# cta-flows served via the HOST's Tailscale node, not its own sidecar.
 #
-# WHY. Standing up a NEW ts-* sidecar requires registering a new node, and the
-# TS_AUTHKEY in the droplet .env is dead:
+# WHY NOT A SIDECAR. Standing up a new ts-* sidecar means registering a new
+# Tailscale node, and the TS_AUTHKEY in the droplet .env is dead:
 #     invalid key: API key does not exist
-# Every existing sidecar keeps working because it has persisted state in its
-# ts-<name>-state volume and never re-registers. Only a new one needs the key.
+# Existing sidecars are unaffected -- they hold persisted state in their
+# ts-<name>-state volumes and never re-register. Only a NEW node needs the key,
+# and ts-cta-flows crash-looped 6 times before that was diagnosed.
 #
-# This binds the app to the host's own tailnet address (100.78.25.100, node
-# kx-macro), so it is reachable from any tailnet device and NOT from the public
-# internet — the same privacy posture as the sidecars, minus the HTTPS cert and
-# the friendly hostname.
+# WHAT THIS DOES INSTEAD. The droplet host is itself a registered tailnet node
+# (kx-macro), so `tailscale serve` on the host fronts the container over HTTPS
+# with a real cert and no new registration:
 #
-#     http://100.78.25.100:8058
+#     https://kx-macro.tail284e0d.ts.net:8443
 #
-# TO REVERT once a fresh reusable TS_AUTHKEY is in .env, just stop using this
-# file and bring up the pair normally:
+# The container binds 127.0.0.1 ONLY, so the app has exactly one entry point and
+# is not reachable even on the tailnet except through the served endpoint.
+#
+# Set up once on the host (persists in tailscaled state across restarts):
+#     tailscale serve --bg --https=8443 http://127.0.0.1:8058
+#
+# TO MOVE TO A SIDECAR later, once a fresh reusable TS_AUTHKEY is in .env:
+#     tailscale serve --https=8443 off
 #     docker compose up -d ts-cta-flows
 #     docker compose up -d --force-recreate cta-flows   # app AFTER the sidecar
-# (the app must be (re)created after the sidecar is running, or it binds a
-# namespace that is then replaced — that is what happened on first deploy here.)
+# The app must be (re)created after the sidecar is RUNNING. Creating it first
+# binds a namespace the sidecar then replaces: the two land in different netns
+# while docker ps still reads "Up (healthy)", because the healthcheck runs
+# inside the app's own orphaned namespace. That is what happened here on the
+# first deploy (4026533448 vs 4026533567).
 #
 # Usage:
 #     docker compose -f docker-compose.yml -f docker-compose.cta-flows-direct.yml \
@@ -30,4 +38,4 @@ services:
     networks: [kx]
     depends_on: !reset []
     ports:
-      - "100.78.25.100:8058:8058"
+      - "127.0.0.1:8058:8058"
