@@ -26,6 +26,7 @@ declare -A REPOS=(
     [g10_cb_intel]=main
     [g10_ois_meeting_pricer]=main
     [es_nq_session_monitor]=main
+    [cta_flows]=main
     [eur-excess-liquidity-monitor]=main
     [korea_equity_positioning]=main
     [mpr_rules_panel]=main

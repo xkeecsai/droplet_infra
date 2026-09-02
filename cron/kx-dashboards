@@ -1,0 +1,22 @@
+# kx-infra whole-stack health check.
+# Install with:  install -m 0644 cron/kx-dashboards /etc/cron.d/kx-dashboards
+#
+# Context: before 2026-08-23 this droplet had NO scheduler of any kind — no
+# cron, no timers. Dashboards froze while still serving HTTP 200 and nobody
+# found out for 45 days. The refresh automation shipped inside the dashboard
+# repos is launchd (MacMini-only) and does not apply here.
+#
+# NOTE: the cb-speeches corpus refresh is NOT scheduled here. It is owned by
+# /etc/cron.d/cb-speeches (02:00 UTC / 06:00 Dubai), which runs the same
+# ./refresh-cb-speeches.sh wrapper. Do not add a second refresh entry — two
+# runs a day buys nothing and they would contend on the same flock.
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO=""
+
+# Whole-stack reachability + staleness check.
+# 02:30 UTC = 06:30 Dubai — after the 02:00 refresh has landed (it takes
+# ~11-13 min) and before the 07:00 Dubai decision slot. This log is the thing
+# to read when a dashboard "looks fine" but isn't.
+30 2 * * *  root  cd /opt/kx/droplet_infra && ./stack-health.sh >> /var/log/kx-stack-health.log 2>&1

@@ -393,6 +393,57 @@ services:
         condition: service_started
 
   # ─────────────────────────────────────────────────────────────────────────
+  # CTA Flow Estimator (Dash) — trend-follower positioning & flows, scored
+  # against the published GS / UBS prints. Databento futures feed.
+  #
+  # Refresh: the app carries its OWN 21:00 Europe/London scheduler thread
+  # (CTA_REFRESH=1). The droplet has no cron and no systemd timers, so a
+  # dashboard without an internal trigger freezes while still serving 200s.
+  # /healthz reports DATA FRESHNESS and 503s once the schedule has not fired
+  # in 26h — it is not merely a liveness probe.
+  # ─────────────────────────────────────────────────────────────────────────
+  ts-cta-flows:
+    image: tailscale/tailscale:latest
+    container_name: ts-cta-flows
+    hostname: cta-flows
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?}
+      TS_HOSTNAME: cta-flows
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "false"
+      TS_ENABLE_HEALTH_CHECK: "true"
+    volumes:
+      - ts-cta-flows-state:/var/lib/tailscale
+      - ./tailscale/cta-flows-serve.json:/config/serve.json:ro
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [NET_ADMIN, NET_RAW]
+    networks: [kx]
+
+  cta-flows:
+    build:
+      context: /opt/kx/repos/cta_flows
+    container_name: cta-flows
+    restart: unless-stopped
+    environment:
+      PORT: "8058"
+      CTA_REFRESH: "1"
+      TZ: Europe/London
+      DATABENTO_API_KEY: ${DATABENTO_API_KEY:?cta-flows needs DATABENTO_API_KEY}
+      ALPHAVANTAGE_API_KEY: ${ALPHAVANTAGE_API_KEY:-}
+    volumes:
+      # Named volume so a rebuild does not refetch 5y x 35 contracts.
+      - cta-flows-cache:/app/data_cache
+      # Bind mount for user-supplied series (e.g. a Bloomberg JB1 export as
+      # JP7.csv, which is the only way to fix Japan inside the YCC window).
+      - /opt/kx/data/cta-flows/user_series:/app/user_series
+    network_mode: "service:ts-cta-flows"
+    depends_on:
+      ts-cta-flows:
+        condition: service_started
+
+  # ─────────────────────────────────────────────────────────────────────────
   # Dealer Repo-Funding Fragility Monitor (Dash) — NY Fed PD stats, keyless
   # ─────────────────────────────────────────────────────────────────────────
   ts-fragility:
@@ -885,6 +936,8 @@ services:
 
 
 volumes:
+  ts-cta-flows-state:
+  cta-flows-cache:
   ts-jgb-demand-state:
   jgb-demand-cache:
   ts-es-nq-sessions-state:
