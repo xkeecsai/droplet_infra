@@ -1,0 +1,33 @@
+# INTERIM override for cta-flows — serve on the host's tailnet IP directly,
+# with no Tailscale sidecar.
+#
+# WHY. Standing up a NEW ts-* sidecar requires registering a new node, and the
+# TS_AUTHKEY in the droplet .env is dead:
+#     invalid key: API key does not exist
+# Every existing sidecar keeps working because it has persisted state in its
+# ts-<name>-state volume and never re-registers. Only a new one needs the key.
+#
+# This binds the app to the host's own tailnet address (100.78.25.100, node
+# kx-macro), so it is reachable from any tailnet device and NOT from the public
+# internet — the same privacy posture as the sidecars, minus the HTTPS cert and
+# the friendly hostname.
+#
+#     http://100.78.25.100:8058
+#
+# TO REVERT once a fresh reusable TS_AUTHKEY is in .env, just stop using this
+# file and bring up the pair normally:
+#     docker compose up -d ts-cta-flows
+#     docker compose up -d --force-recreate cta-flows   # app AFTER the sidecar
+# (the app must be (re)created after the sidecar is running, or it binds a
+# namespace that is then replaced — that is what happened on first deploy here.)
+#
+# Usage:
+#     docker compose -f docker-compose.yml -f docker-compose.cta-flows-direct.yml \
+#         up -d cta-flows
+services:
+  cta-flows:
+    network_mode: !reset null
+    networks: [kx]
+    depends_on: !reset []
+    ports:
+      - "100.78.25.100:8058:8058"
