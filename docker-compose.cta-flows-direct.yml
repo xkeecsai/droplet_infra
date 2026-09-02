@@ -11,18 +11,22 @@
 # (kx-macro), so `tailscale serve` on the host fronts the container over HTTPS
 # with a real cert and no new registration:
 #
-#     https://kx-macro.tail284e0d.ts.net:8443
+#     https://kx-macro.tail284e0d.ts.net
 #
 # The container binds loopback (for the serve proxy) AND the host tailnet IP, so
 # both of these work and neither is public:
-#     https://kx-macro.tail284e0d.ts.net:8443   (HTTPS, real cert)
+#     https://kx-macro.tail284e0d.ts.net   (HTTPS, real cert)
 #     http://100.78.25.100:8058                 (plain, same box)
 #
+# PORT 443, not a high port. Every other dashboard is served on 443 via its own
+# sidecar; a tailnet ACL that allows *:443 will not necessarily allow *:8443, so
+# a high port is a needless way to be unreachable.
+#
 # Set up once on the host (persists in tailscaled state across restarts):
-#     tailscale serve --bg --https=8443 http://127.0.0.1:8058
+#     tailscale serve --bg --https=443 http://127.0.0.1:8058
 #
 # TO MOVE TO A SIDECAR later, once a fresh reusable TS_AUTHKEY is in .env:
-#     tailscale serve --https=8443 off
+#     tailscale serve --https=443 off
 #     docker compose up -d ts-cta-flows
 #     docker compose up -d --force-recreate cta-flows   # app AFTER the sidecar
 # The app must be (re)created after the sidecar is RUNNING. Creating it first
